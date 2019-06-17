@@ -1,2 +1,3 @@
 # 2phase-LBM-DNS
-gas-solid two-phase flow simulation with lattice Boltzmann method using DNS
+This project will reproduce the lattice Boltzmann method with DNS (direct numerical simulation) for the gas-solid two-phase flow using c language.
+Details could be found in doi:10.1016/j.partic.2010.07.003.
