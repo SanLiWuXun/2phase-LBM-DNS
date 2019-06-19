@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <math.h>
 
+/*Parameter for setup of the computational zone*/
+const int Nx = 200;
+const int Ny = 800;
+const double g = 3.5e-7;	//gravity
+int t;	//time step
+
 /*Parameter for Bilinear Interpolation*/
 double ESMatrix[121][121];	//solid concentration matrix, reading from SolidConcentration.txt
 double ESMatrixInterval = 0.01;	//sampling interval for data in ESMatrix
@@ -10,6 +16,27 @@ double ESMatrixInterval = 0.01;	//sampling interval for data in ESMatrix
 /*Parameter for LBM*/
 double w[9];	//weight
 int e_x[9], e_y[9];	//discrete velocities
+double f[Nx + 1][Ny + 1][9];	//distribution function in LBM
+double ftemp[Nx + 1][Ny + 1][9];	//temp distribution function in LBM
+
+/*Parameter for the gas phase*/
+double rhog[Nx + 1][Ny + 1];	//gas density, which is corresponding to pressure in LBM
+double ugx[Nx + 1][Ny + 1];	//gas velocity in x direction
+double ugy[Nx + 1][Ny + 1];	//gas velocity in y direction
+const double tao = 0.53;//1.796;	//gas viscosity
+
+/*Parameter for the particle phase*/
+const int PIS = 300;	//particle number in the system
+const double Radius = 5.4;	//particle diameter
+const double ms = 91608.84;	//particle mass, corrsponding to rhos=1000
+double POS[PIS][2];	//particle position
+double VEL[PIS][2];	//particle velocity
+
+/*Parameter for the interaction between the gas and particle phase*/
+int IB[Nx + 1][Ny + 1][2];	//[][][0]--->interaction check, check if interaction exists(=1) or only gas phase(=0)
+							//[][][1]--->interaction index, store the particle number(interaction exists) or equal to -1(only gas phase)
+double InterF[Nx + 1][Ny + 1][2];	//"interaction force" on one gas cell
+double Drag[PIS][2];	//drag between the gas and particle phase
 
 void EsDataRead()	//read solid concentration into ESMatrix
 {
@@ -75,10 +102,46 @@ double f_equ(double ux, double uy, double rho, int b)  //calculate the value of 
 	return feq;
 }
 
+void init()	//initialization
+{
+	int i, j;
+	int b;
+	for (i = 0; i <= Nx; i++)
+	{
+		for (j = 0; j <= Ny; j++)
+		{
+			rhog[i][j] = 1.0;
+			ugx[i][j] = 0.0;
+			ugy[i][j] = 0.1;//0.0;
+
+			for (b = 0; b < 9; b++)
+			{
+				f[i][j][b] = f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b);
+			}
+			IB[i][j][0] = 0;
+			InterF[i][j][0] = 0.0;
+			InterF[i][j][1] = 0.0;
+			IB[i][j][1] = -1;
+		}
+	}
+
+	int k;
+	for (k = 0; k < PIS; k++)
+	{
+		POS[k][0] = (k % 20)*11.0 + 5.5 + ((k / 20) % 2)*5.0;
+		POS[k][1] = (k / 20)*9.8 + 5.5;
+		VEL[k][0] = 0.0;
+		VEL[k][1] = 0.0;
+		Drag[k][0] = 0.0;
+		Drag[k][1] = 0.0;
+	}
+}
+
 int main()
 {
 	EsDataRead();	//read solid concentration into ESMatrix
 	SetLBMParameter();
+	init();
 
 	/*test code*/
 	double x, y, es;
@@ -86,8 +149,8 @@ int main()
 	y = 0.840;
 	es = EsInterp(x, y);
 	printf("%lf\t%lf\t%lf\n", x, y, es);
-	double temp = e_x[6];
-	printf("w[1]=%lf\te_x[6]=%lf\n", w[1],temp);
+	printf("w[1]=%lf\te_x[6]=%d\n", w[1], e_x[6]);
+	printf("f[100][400][5]=%lf\n", f[100][400][5]);
 	getchar();
 	/*test code*/
 
