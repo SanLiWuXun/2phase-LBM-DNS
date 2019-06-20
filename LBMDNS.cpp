@@ -1,3 +1,6 @@
+/*In this first version, main purpose is to realize the LBM-DNS
+  So all functions will be written in one cpp file.
+  And the 2D zone is fully periodic boundary*/
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +19,7 @@ double ESMatrixInterval = 0.01;	//sampling interval for data in ESMatrix
 /*Parameter for LBM*/
 double w[9];	//weight
 int e_x[9], e_y[9];	//discrete velocities
+int MinusB[9];	//-b, the opposite direction of b
 double f[Nx + 1][Ny + 1][9];	//distribution function in LBM
 double ftemp[Nx + 1][Ny + 1][9];	//temp distribution function in LBM
 
@@ -27,7 +31,7 @@ const double tao = 0.53;//1.796;	//gas viscosity
 
 /*Parameter for the particle phase*/
 const int PIS = 300;	//particle number in the system
-const double Radius = 5.4;	//particle diameter
+const double Radius = 5.0;	//particle diameter
 const double ms = 91608.84;	//particle mass, corrsponding to rhos=1000
 double POS[PIS][2];	//particle position
 double VEL[PIS][2];	//particle velocity
@@ -91,6 +95,16 @@ void SetLBMParameter()	//D2Q9
 	e_x[6] = -1, e_y[6] =  1;
 	e_x[7] = -1, e_y[7] = -1;
 	e_x[8] =  1, e_y[8] = -1;
+
+	MinusB[0] = 0;
+	MinusB[1] = 3;
+	MinusB[2] = 4;
+	MinusB[3] = 1;
+	MinusB[4] = 2;
+	MinusB[5] = 7;
+	MinusB[6] = 8;
+	MinusB[7] = 5;
+	MinusB[8] = 6;
 }
 
 double f_equ(double ux, double uy, double rho, int b)  //calculate the value of the equilibrium distribution function
@@ -134,6 +148,40 @@ void init()	//initialization
 		VEL[k][1] = 0.0;
 		Drag[k][0] = 0.0;
 		Drag[k][1] = 0.0;
+	}
+}
+
+void Calc_IB()
+{
+	int i, j;
+	for (i = 0; i <= Nx; i++)
+	{
+		for (j = 0; j <= Ny; j++)
+		{
+			IB[i][j][0] = 0;
+			IB[i][j][1] = -1;
+		}
+	}
+	int k;
+	for (k = 0; k < PIS; k++)
+	{
+		int wb, eb, nb, sb;			//collision boundary : boundary index that overlap with the particle
+		double RSearch;
+		RSearch = Radius + 0.5;	//overlap only when distance between centroid of cell and particle is less than (Radius+cell size/2)
+								//should be noted that under this conditon, there is still some case that no overlap happens
+		wb = floor(POS[k][0] - RSearch);
+		eb = ceil(POS[k][0] + RSearch);
+		nb = ceil(POS[k][1] + RSearch);
+		sb = floor(POS[k][1] - RSearch);
+
+		for (i = wb; i <= eb; i++)
+		{
+			for (j = sb; j <= nb; j++)
+			{
+				IB[i][j][0] = 1;
+				IB[i][j][1] = k;
+			}
+		}
 	}
 }
 
