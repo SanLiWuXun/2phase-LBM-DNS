@@ -9,8 +9,8 @@
 /*Parameter for setup of the computational zone*/
 const int Nx = 200;
 const int Ny = 800;
-const double g = 3.5e-7;	//gravity
-int t;	//time step
+const double g = -3.5e-7;	//gravity
+int tmax = 10;	//time step
 
 /*Parameter for Bilinear Interpolation*/
 double ESMatrix[121][121];	//solid concentration matrix, reading from SolidConcentration.txt
@@ -39,7 +39,7 @@ double VEL[PIS][2];	//particle velocity
 /*Parameter for the interaction between the gas and particle phase*/
 int IB[Nx + 1][Ny + 1][2];	//[][][0]--->interaction check, check if interaction exists(=1) or only gas phase(=0)
 							//[][][1]--->interaction index, store the particle number(interaction exists) or equal to -1(only gas phase)
-double InterF[Nx + 1][Ny + 1][2];	//"interaction force" on one gas cell
+double Omega[Nx + 1][Ny + 1][9];	//"interaction force" on one gas cell
 double Drag[PIS][2];	//drag between the gas and particle phase
 
 void EsDataRead()	//read solid concentration into ESMatrix
@@ -131,10 +131,9 @@ void init()	//initialization
 			for (b = 0; b < 9; b++)
 			{
 				f[i][j][b] = f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b);
+				Omega[i][j][b] = 0.0;
 			}
 			IB[i][j][0] = 0;
-			InterF[i][j][0] = 0.0;
-			InterF[i][j][1] = 0.0;
 			IB[i][j][1] = -1;
 		}
 	}
@@ -185,11 +184,116 @@ void Calc_IB()
 	}
 }
 
+void evolution()
+{
+	for (int k = 0; k < PIS; k++)	//reset drag force to 0 for all particles
+	{
+		Drag[k][0] = 0.0;
+		Drag[k][1] = 0.0;
+	}
+	for (int i = 0; i <= Nx; i++)
+	{
+		for (int j = 0; j <= Ny; j++)
+		{
+			double beta;
+			if (IB[i][j][0] == 1)
+			{
+				int IndexParticle;
+				double Xdis, Ydis;	//diatance to center of particle in x/y direction
+				double rx, ry, es;	//rx=fabs(Xdis)/Radius,ry=fabs(Ydis)/Radius
+				IndexParticle = IB[i][j][1];
+				Xdis = 0.5 + i - POS[IndexParticle][0];
+				Ydis = 0.5 + j - POS[IndexParticle][1];
+				rx = fabs(Xdis) / Radius;
+				ry = fabs(Ydis) / Radius;
+				es = EsInterp(rx, ry);
+				beta = es * (tao - 0.5) / (1 - es + tao - 0.5);
+
+				for (int b = 0; b < 9; b++)
+				{
+					
+					double temp1, temp2;
+					temp1 = f_equ(VEL[IndexParticle][0], VEL[IndexParticle][1], rhog[i][j], b);
+					temp2 = f_equ(ugx[i][j], ugy[i][j], rhog[i][j], MinusB[b]);
+					Omega[i][j][b] = f[i][j][MinusB[b]] - f[i][j][b] + temp1 - temp2;
+
+					double temp3;
+					double dot, Fterm;
+					temp3 = (1.0 - beta)*(f[i][j][b] - f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b)) / tao;
+					dot = (e_y[b] - ugy[i][j])*g;	//(e_x[b] - ugx[i][j])*0.0 + (e_y[b] - ugy[i][j])*g
+					Fterm = (1.0 - 1.0 / 2.0 / tao)*dot*3.0*f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b);
+					ftemp[i][j][b] = f[i][j][b] - temp3 + beta * Omega[i][j][b] + Fterm;
+
+					Drag[IndexParticle][0] = Drag[IndexParticle][0] + beta * Omega[i][j][b] * e_x[b];	//calculate drag force in x direction
+					Drag[IndexParticle][1] = Drag[IndexParticle][1] + beta * Omega[i][j][b] * e_y[b];	//calculate drag force in y direction
+				}
+			}
+			else
+			{
+				//beta = 0.0;
+				for (int b = 0; b < 9; b++)
+				{
+					//Omega[i][j][b] = 0.0;
+					double dot, Fterm;
+					dot = (e_y[b] - ugy[i][j])*g;	//(e_x[b] - ugx[i][j])*0.0 + (e_y[b] - ugy[i][j])*g
+					Fterm = (1.0 - 1.0 / 2.0 / tao)*dot*3.0*f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b);
+					ftemp[i][j][b] = f[i][j][b] - (f[i][j][b] - f_equ(ugx[i][j], ugy[i][j], rhog[i][j], b)) / tao + Fterm;
+				}
+			}
+		}
+	}
+
+	for (int i = 0; i <= Nx; i++)	//update f and calculate the macro variables
+	{
+		for (int j = 0; j <= Ny; j++)
+		{
+			rhog[i][j] = 0.0;
+			ugx[i][j] = 0.0;
+			ugy[i][j] = 0.0;
+			for (int b = 0; b < 9; b++)
+			{
+				int ip, jp;
+				ip = i - e_x[b];
+				if (ip < 0)	//periodic boundary
+				{
+					ip = Nx;
+				}
+				if (ip > Nx)	//periodic boundary
+				{
+					ip = 0;
+				}
+				jp = j - e_y[b];
+				if (jp < 0)	//periodic boundary
+				{
+					jp = Ny;
+				}
+				if (jp > Ny)	//periodic boundary
+				{
+					jp = 0;
+				}
+				f[i][j][b] = ftemp[ip][jp][b];
+				rhog[i][j] = rhog[i][j] + f[i][j][b];
+				ugx[i][j] = ugx[i][j] + e_x[b] * f[i][j][b];
+				ugy[i][j] = ugy[i][j] + e_y[b] * f[i][j][b];
+			}
+			ugx[i][j] = ugx[i][j] / rhog[i][j];
+			ugy[i][j] = (ugy[i][j] + 0.5*ms*g) / rhog[i][j];
+		}
+	}
+}
+
 int main()
 {
 	EsDataRead();	//read solid concentration into ESMatrix
 	SetLBMParameter();
 	init();
+	//
+	for (int t = 0; t < tmax; t++)
+	{
+		printf("t=%d\n",t);
+		Calc_IB();
+		evolution();
+	}
 
 	/*test code*/
 	double x, y, es;

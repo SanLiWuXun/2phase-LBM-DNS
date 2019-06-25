@@ -15,3 +15,5 @@ This project will reproduce the lattice Boltzmann method with DNS (direct numeri
 	+ void SetLBMParameter() ---> D2Q9
 	+ double f_equ(double ux, double uy, double rho, int b) ---> calculate the value of the equilibrium distribution function
 	+ void init() ---> initialization for all parameters
+	+ Calc_IB() ---> check if interaction exists between the gas and particle phase, and record the particle number
+	+ void evolution() ---> evolution of LBM scheme, calculating the drag force and gas macro propeties at the same time (the force term uses He-Shan-Dollen model)
