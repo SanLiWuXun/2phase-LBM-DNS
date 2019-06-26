@@ -35,6 +35,7 @@ const double Radius = 5.0;	//particle diameter
 const double ms = 91608.84;	//particle mass, corrsponding to rhos=1000
 double POS[PIS][2];	//particle position
 double VEL[PIS][2];	//particle velocity
+double e = 0.8;//Coefficient of restitution between particles
 
 /*Parameter for the interaction between the gas and particle phase*/
 int IB[Nx + 1][Ny + 1][2];	//[][][0]--->interaction check, check if interaction exists(=1) or only gas phase(=0)
@@ -282,6 +283,113 @@ void evolution()
 	}
 }
 
+void ParticleMove()
+{
+	int k;
+	for (k = 0; k < PIS; k++)
+	{
+		double ax, ay;
+		ax = Drag[k][0] / ms;
+		ay = Drag[k][1] / ms + g;
+
+		VEL[k][0] = VEL[k][0] + ax * 1.0;
+		VEL[k][1] = VEL[k][1] + ay * 1.0;
+
+		POS[k][0] = POS[k][0] + VEL[k][0] * 1.0;
+		POS[k][1] = POS[k][1] + VEL[k][1] * 1.0;
+
+		if (POS[k][0] < 0.0)
+		{
+			POS[k][0] = POS[k][0] + Nx + 1;
+		}
+		if (POS[k][0] > Nx+1)
+		{
+			POS[k][0] = POS[k][0] - Nx - 1;
+		}
+		if (POS[k][1] < 0.0)
+		{
+			POS[k][1] = POS[k][1] + Ny + 1;
+		}
+		if (POS[k][1] > Ny+1)
+		{
+			POS[k][1] = POS[k][1] - Ny - 1;
+		}
+	}
+	int k0, k1;
+	for (k0 = 0; k0 < PIS - 1; k0++)
+	{
+		for (k1 = k0 + 1; k1 < PIS; k1++)
+		{
+			/*//for normal case - with wall boundaries
+			double check1, check2;
+			check1 = (POS[k0][0] - POS[k1][0])*(VEL[k0][0] - VEL[k1][0]) + (POS[k0][1] - POS[k1][1])*(VEL[k0][1] - VEL[k1][1]);
+			double rab2;
+			rab2 = (POS[k0][0] - POS[k1][0])*(POS[k0][0] - POS[k1][0]) + (POS[k0][1] - POS[k1][1])*(POS[k0][1] - POS[k1][1]);
+			check2 = sqrt(rab2);*/
+
+			//for two periodic boundaries
+			double check1, check2;
+			check1 = (POS[k0][0] - POS[k1][0])*(VEL[k0][0] - VEL[k1][0]) + (POS[k0][1] - POS[k1][1])*(VEL[k0][1] - VEL[k1][1]);
+			double rab2;
+			double disX, disY;	//distance between two particles in x and y direction
+			double disXCouple, disYCouple;	//Coupled 'distance' between two particles in x and y direction
+			double MinX, MinY;
+			disX = fabs(POS[k0][0] - POS[k1][0]);
+			disY = fabs(POS[k0][1] - POS[k1][1]);
+			disXCouple = Nx + 1 - disX;
+			disYCouple = Ny + 1 - disY;
+			MinX = (disX > disXCouple) ? disXCouple : disX;
+			MinY = (disY > disYCouple) ? disYCouple : disY;
+			rab2 = MinX * MinX + MinY * MinY;
+			check2 = sqrt(rab2);
+
+			if ((check2 < 2.0*Radius) && (check1 < 0.0))
+			{
+				double n[2], G0[2], Modn;
+				n[0] = POS[k1][0] - POS[k0][0];
+				n[1] = POS[k1][1] - POS[k0][1];
+				Modn = sqrt(n[0] * n[0] + n[1] * n[1]);
+				n[0] = n[0] / Modn;
+				n[1] = n[1] / Modn;
+				G0[0] = VEL[k0][0] - VEL[k1][0];
+				G0[1] = VEL[k0][1] - VEL[k1][1];
+				double ndotG0;
+				ndotG0 = n[0] * G0[0] + n[1] * G0[1];
+
+				VEL[k0][0] = VEL[k0][0] - 0.5*(1.0 + e)*ndotG0*n[0];
+				VEL[k0][1] = VEL[k0][1] - 0.5*(1.0 + e)*ndotG0*n[1];
+				VEL[k1][0] = VEL[k1][0] + 0.5*(1.0 + e)*ndotG0*n[0];
+				VEL[k1][1] = VEL[k1][1] + 0.5*(1.0 + e)*ndotG0*n[1];
+			}
+		}
+	}
+	/*//for normal case - with wall boundaries
+	double ew = 0.5;//Coefficient restitution between particle and wall
+	for (k = 0; k < PIS; k++)
+	{
+		if (POS[k][0] < Radius)
+		{
+			POS[k][0] = 2.0*Radius - POS[k][0];
+			VEL[k][0] = -ew * VEL[k][0];
+		}
+		else if (POS[k][0] > (Nx - Radius))
+		{
+			POS[k][0] = 2.0*(Nx - Radius) - POS[k][0];
+			VEL[k][0] = -ew * VEL[k][0];
+		}
+		if (POS[k][1] < Radius)
+		{
+			POS[k][1] = 2.0*Radius - POS[k][1];
+			VEL[k][1] = -ew * VEL[k][1];
+		}
+		else if (POS[k][1] > (Ny - Radius))
+		{
+			POS[k][1] = 2.0*(Ny - Radius) - POS[k][1];
+			VEL[k][1] = -ew * VEL[k][1];
+		}
+	}*/
+}
+
 int main()
 {
 	EsDataRead();	//read solid concentration into ESMatrix
@@ -293,6 +401,7 @@ int main()
 		printf("t=%d\n",t);
 		Calc_IB();
 		evolution();
+		ParticleMove();
 	}
 
 	/*test code*/

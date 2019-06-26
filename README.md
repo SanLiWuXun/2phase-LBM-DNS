@@ -17,3 +17,4 @@ This project will reproduce the lattice Boltzmann method with DNS (direct numeri
 	+ void init() ---> initialization for all parameters
 	+ Calc_IB() ---> check if interaction exists between the gas and particle phase, and record the particle number
 	+ void evolution() ---> evolution of LBM scheme, calculating the drag force and gas macro propeties at the same time (the force term uses He-Shan-Dollen model)
+	+ void ParticleMove() ---> calculate particle collision, at the same time refresh particle velocity and position
