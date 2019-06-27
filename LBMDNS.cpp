@@ -142,8 +142,8 @@ void init()	//initialization
 	int k;
 	for (k = 0; k < PIS; k++)
 	{
-		POS[k][0] = (k % 20)*11.0 + 5.5 + ((k / 20) % 2)*5.0;
-		POS[k][1] = (k / 20)*9.8 + 5.5;
+		POS[k][0] = (k % 10)*20.0 + 10.0;
+		POS[k][1] = (k / 10)*20.0 + 100.0;
 		VEL[k][0] = 0.0;
 		VEL[k][1] = 0.0;
 		Drag[k][0] = 0.0;
@@ -319,6 +319,7 @@ void ParticleMove()
 	for (k0 = 0; k0 < PIS - 1; k0++)
 	{
 		for (k1 = k0 + 1; k1 < PIS; k1++)
+
 		{
 			/*//for normal case - with wall boundaries
 			double check1, check2;
@@ -390,18 +391,56 @@ void ParticleMove()
 	}*/
 }
 
+void writefile_gas(int numb)
+{
+	FILE *fp1;
+	char FileName[100];
+	sprintf(FileName, "gas_%d.plt", numb);
+	fp1 = fopen(FileName, "w");
+	fprintf(fp1, "variables=x,y,rho,ux,uy\n zone i=%d,j=%d,f=point\n", Nx + 1, Ny + 1);
+	int i, j;
+	for (j = 0; j <= Ny; j++)
+	{
+		for (i = 0; i <= Nx; i++)
+		{
+			fprintf(fp1, "%20.10e %20.10e %20.10e %20.10e %20.10e\n", i*1.0, j*1.0, rhog[i][j], ugx[i][j], ugy[i][j]);
+		}
+	}
+	fclose(fp1);
+}
+
+void writefile_particle(int numb)
+{
+	FILE *fp2;
+	char FileName[100];
+	sprintf(FileName, "particle_%d.plt", numb);
+	fp2 = fopen(FileName, "w");
+	fprintf(fp2, "variables=particlenumber posx posy velx vely\n");
+	int k;
+	for (k = 0; k < PIS; k++)
+	{
+		fprintf(fp2, "%20.10e %20.10e %20.10e %20.10e %20.10e\n", k*1.0, POS[k][0], POS[k][1], VEL[k][0], VEL[k][1]);
+	}
+	fclose(fp2);
+}
+
 int main()
 {
 	EsDataRead();	//read solid concentration into ESMatrix
 	SetLBMParameter();
 	init();
 	//
-	for (int t = 0; t < tmax; t++)
+	for (int t = 0; t <= tmax; t++)
 	{
 		printf("t=%d\n",t);
 		Calc_IB();
 		evolution();
 		ParticleMove();
+		if (t % 10 == 0)
+		{
+			writefile_gas(t);
+			writefile_particle(t);
+		}
 	}
 
 	/*test code*/
