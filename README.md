@@ -9,6 +9,7 @@ This project will reproduce the lattice Boltzmann method with DNS (direct numeri
 	  - readme.txt ---> detailed description for files in this folder
 	+ LBMDNS.cpp ---> main program using c program
 	+ SolidConcentration.txt ---> solid concentration data
+	+ UnitConversion.py ---> a simple python tool to convert SI uint to lattice unit
 ### 2. Functions in LBMDNS.cpp:
 	+ void EsDataRead() ---> read solid concentration into ESMatrix
 	+ double EsInterp(double x,double y) ---> calculate solid concentration using bilinear interpolation
